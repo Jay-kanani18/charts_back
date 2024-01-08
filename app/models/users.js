@@ -16,7 +16,9 @@ const user = new Schema({
         query:{type: Array, default: []},
         // collection:{type: String, default: []}
     }],
-    charts_catagory:{type:Array,default:[]}
+    charts_catagory:{type:Array,default:[]},
+    charts_subcatagory:{type:Array,default:[]},
+    charts_array:{type:Array,default:[]}
 
   
 

@@ -4,20 +4,16 @@ const Schema = mongoose.Schema;
 const charts = new Schema({
    
     name: {type: String, default: null},
-    parent_id:{type:Array,default:[]},
+    // parent_id:{type:Array,default:[]},
     chart_type:{type:Number,default:0},
-    query:{type:Array,default:{$match:{}}},
+    query:{type:String,default:{$match:{}}},
+    
     suggestion:{
         type:{
             type:Number,
             description:String
         }
     }
-
-   
-
-  
-
 }, {
   usePushEach: true 
 }, {
@@ -29,4 +25,4 @@ const charts = new Schema({
 })
 
 
-module.exports = mongoose.model('Charts', charts);
+module.exports = mongoose.model('Charts',  charts );

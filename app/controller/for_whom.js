@@ -1,7 +1,8 @@
-let For_whom = require("../models/for_whom")
-var User = require('../models/users'); // include user controller ////
+const { ObjectId } = require("mongodb");
+const For_whom = require("../models/for_whom")
+const User = require('../models/users'); // include user controller ////
 
-module.exports = class For_whom{
+module.exports = class ForWhom{
 
     async get_for_whom (req, res) {
 
@@ -9,11 +10,26 @@ module.exports = class For_whom{
 
 
             let user_detail = await User.findById(req.query.id)
-            console.log("🚀 ~ file: for_whom.js:12 ~ user_detail:", user_detail)
 
 
-            let for_whom = await For_whom.find({ _id: { $in: user_detail.charts_catagory || [] } })
-            console.log("🚀 ~ file: for_whom.js:16 ~ for_whom:", for_whom)
+            let for_whom = await For_whom.aggregate([
+                                                        {
+                                                            "$match":{
+                                                             _id: { 
+                                                             "$in": user_detail.charts_catagory 
+                                                            } 
+                                                        }
+                                                    },
+                                                    {
+                                                        "$lookup":{
+                                                            from:"for_whats",
+                                                            foreignField:"_id",
+                                                            localField:"for_what_Array",
+                                                            pipeline:[{$project:{_id:1,name:1}}],
+                                                            as:"for_what_Array"
+                                                        }
+                                                    }
+                                                ])
 
             return res.json({ status: true, data: for_whom })
         } catch (error) {
@@ -27,10 +43,13 @@ module.exports = class For_whom{
         try {
 
 
+            let duplicate = await For_whom.findOne({name:req.body.name})
+
+            if(duplicate) res.json({status:false,error:1})
+
+
             let for_whom = new For_whom(req.body)
-            console.log("🚀 ~ file: for_whom.js:30 ~ req.body:", req.body)
-            
-            console.log("🚀 ~ file: for_whom.js:32 ~ for_whom:", for_whom)
+       
             await for_whom.save()
 
             
@@ -42,6 +61,49 @@ module.exports = class For_whom{
             console.log(error);
 
         }
+    }
+
+    async save_for_whom(req,res){
+        
+        try {
+
+            let duplicate = await For_whom.findOne({name:req.body.name})
+
+            if(duplicate) res.json({status:false,error:1})
+
+
+
+            let for_whom = await For_whom.findByIdAndUpdate(req.query.id,req.body)
+
+
+
+            return res.json({ status: true, data: for_whom })
+        } catch (error) {
+            console.log(error);
+
+        }
+
+
+
+    }
+    async remove_for_whom(req,res){
+        
+        try {
+
+
+            console.log(req.query.id);
+            let for_whom = await User.findByIdAndUpdate(req.query.user_id,{$pull:{charts_catagory:new ObjectId(req.query.id)}})
+
+
+
+            return res.json({ status: true, data: for_whom })
+        } catch (error) {
+            console.log(error);
+
+        }
+
+
+
     }
 
 

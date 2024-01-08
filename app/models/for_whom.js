@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 const for_whom = new Schema({
    
     name: {type: String, default: ""},
-    for_what_Array:{type:[ObjectId],default:[]}
+    for_what_Array:{type:Array,default:[]}
      
 }, {
   usePushEach: true 
