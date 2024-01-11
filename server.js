@@ -118,11 +118,8 @@ const app = express()
 
 var whitelist = [
   "https://analytics.elluminatiinc.net",
-
   "http://localhost:9000",
   "http://localhost:9200",
-
-
 ];
 var corsOptionsDelegate = function (req, callback) {
   var corsOptions;
@@ -136,7 +133,7 @@ var corsOptionsDelegate = function (req, callback) {
 };
 
 
-app.use(cors(corsOptionsDelegate))
+app.use(cors())
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
