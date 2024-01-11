@@ -14,19 +14,25 @@ let Order_payments
 let Reviews
 let Countries
 async function init() {
-  let client = new MongoClient("mongodb://localhost:27017", { useNewUrlParser: true, useUnifiedTopology: true });
-  await client.connect();
-  database = client.db('hopdb');
-  Orders = database.collection('orders');
-  Users = database.collection('users');
-  Analytics = database.collection('analytics');
-  Order_payments = database.collection('order_payments');
-  Reviews = database.collection('reviews');
-  Countries = database.collection('countries');
+
+  try {
+
+    let client = new MongoClient("mongodb+srv://hopdemo:akQWOEus3ajieR@hop-prod-db.oo3hb.mongodb.net");
+    await client.connect();
+    console.log("conected");
+    database = client.db('hopdb');
+    Orders = database.collection('orders');
+    Users = database.collection('users');
+    Analytics = database.collection('analytics');
+    Order_payments = database.collection('order_payments');
+    Reviews = database.collection('reviews');
+    Countries = database.collection('countries');
+  } catch (e) {
+    console.log(e);
+  }
 }
 init()
 
-console.log(new Date());
 module.exports = class ChartsClass {
 
   async get_chart_list(req, res) {
@@ -104,20 +110,22 @@ module.exports = class ChartsClass {
 
     try {
 
-      console.log(req.query);
+      console.log(req.body.params);
 
       let currentDate = new Date();
       let startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
       let endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
 
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
+      const date = created_at.getDate()
 
       const day = created_at.getDay()
+
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
 
 
@@ -203,13 +211,34 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
 
+        if (req.body.params.startDate == req.body.params.endDate) {
+
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -259,13 +288,42 @@ module.exports = class ChartsClass {
           }
         }]
 
+      let pipeline2 = [
+        {
+          $lookup: {
+            from: "countries",
+
+            let: {
+
+              localField: "country_name",
+              foreignField: "country_name",
+            },
+            pipeline: [{ $project: { country_name: 1, _id: 1 } }],
+            as: "country"
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total_users: { $sum: 1 }
+          }
+        },
+
+      ]
 
 
-      let country_filter = req.query.country_id
+
+      let country_filter = req.body.params.country_id
+
+
+
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
+      let filter2 = { $match: { "country._id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
+      pipeline2.splice(1, 0, filter2)
       pipeline.unshift(date_filter)
+      pipeline2.unshift(date_filter)
 
 
 
@@ -278,7 +336,11 @@ module.exports = class ChartsClass {
       if (latest_data.length == 0) {
         latest_data.push({})
       }
-      latest_data[0].total_users = await Users.count({ country_id: new ObjectId(country_filter) })
+
+      console.log(JSON.stringify(pipeline));
+      console.log(JSON.stringify(pipeline2));
+      let data = await Users.aggregate(pipeline2).toArray()
+      latest_data[0].total_users = data[0]?.total_users
 
 
 
@@ -299,7 +361,7 @@ module.exports = class ChartsClass {
 
 
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
 
@@ -308,11 +370,13 @@ module.exports = class ChartsClass {
 
       // const week = Math.ceil(((created_at - onejan) / 86400000 + onejan.getDay() + 1) / 7);
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
 
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
 
       switch (type) {
@@ -395,13 +459,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -418,8 +502,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "users",
-            localField: "user_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "user_id",
+              foreignField: "_id",
+            },
             pipeline: [{ $project: { device_type: 1, _id: 1 } }],
             as: "user_detail"
           }
@@ -495,7 +582,7 @@ module.exports = class ChartsClass {
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -522,7 +609,7 @@ module.exports = class ChartsClass {
     try {
 
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
 
@@ -531,11 +618,13 @@ module.exports = class ChartsClass {
 
       // const week = Math.ceil(((created_at - onejan) / 86400000 + onejan.getDay() + 1) / 7);
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
 
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
 
       switch (type) {
@@ -618,13 +707,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -638,8 +747,9 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "carts",
-            "localField": "cart_id",
-            "foreignField": "_id",
+
+              "localField": "cart_id",
+              "foreignField": "_id",
             "as": "cart_detail"
           }
         },
@@ -742,8 +852,9 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "carts",
-            "localField": "cart_id",
-            "foreignField": "_id",
+
+              "localField": "cart_id",
+              "foreignField": "_id",
             "as": "cart_detail"
           }
         },
@@ -845,7 +956,7 @@ module.exports = class ChartsClass {
         }
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline1.unshift(filter)
@@ -875,13 +986,15 @@ module.exports = class ChartsClass {
 
 
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -963,13 +1076,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -984,8 +1117,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "stores",
-            localField: "store_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "store_id",
+              foreignField: "_id",
+            },
             pipeline: [{ "$project": { "country_id": 1, "_id": 1 } }],
             as: "store"
           }
@@ -1014,7 +1150,7 @@ module.exports = class ChartsClass {
         }
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       console.log(country_filter);
 
@@ -1049,13 +1185,15 @@ module.exports = class ChartsClass {
   async API_5(req, res) {
 
     try {
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -1137,13 +1275,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -1210,7 +1368,7 @@ module.exports = class ChartsClass {
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -1233,13 +1391,15 @@ module.exports = class ChartsClass {
   async API_6(req, res) {
 
     try {
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -1322,13 +1482,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -1420,7 +1600,7 @@ module.exports = class ChartsClass {
         }
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -1441,13 +1621,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -1529,13 +1711,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -1584,13 +1786,16 @@ module.exports = class ChartsClass {
             revenue: -1,
           },
         },
-        { $limit: 5 },
+        { "$limit": 5 },
 
         {
           $lookup: {
             from: "providers",
-            localField: "_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "_id",
+              foreignField: "_id",
+            },
             pipeline: [
               {
                 $project: {
@@ -1607,10 +1812,11 @@ module.exports = class ChartsClass {
         {
           $unwind: "$provider",
         },
+        { "$limit": 5 },
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -1631,13 +1837,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -1719,20 +1927,40 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
 
       }
 
-      let pipeline = [
+      let pipeline1 = [
         {
           $match: {
             user_id: {
@@ -1773,16 +2001,19 @@ module.exports = class ChartsClass {
             revenue: -1,
           },
         },
-        { $limit: 5 },
+        {"$limit": 5 },
 
         {
           $lookup: {
-            from: "users",
-            localField: "_id",
-            foreignField: "_id",
-            pipeline: [
+            'from': "users",
+            'let': {
+
+              'localField': "_id",
+              'foreignField': "_id",
+            },
+            'pipeline': [
               {
-                $project: {
+                '$project': {
                   first_name: 1,
                   last_name: 1,
                   unique_id: 1,
@@ -1796,17 +2027,18 @@ module.exports = class ChartsClass {
         {
           $unwind: "$user",
         },
+        { "$limit": 5 },
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
-      pipeline.unshift(filter)
-      pipeline.unshift(date_filter)
+      pipeline1.unshift(filter)
+      pipeline1.unshift(date_filter)
 
 
 
-      let orders = await Orders.aggregate(pipeline).toArray()
+      let orders = await Orders.aggregate(pipeline1).toArray()
 
 
 
@@ -1820,13 +2052,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -1908,13 +2142,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -1928,8 +2182,9 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "cities",
-            "localField": "city_id",
-            "foreignField": "_id",
+
+              "localField": "city_id",
+              "foreignField": "_id",
             "as": "city_detail"
           }
         },
@@ -1951,8 +2206,10 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "stores",
-            "localField": "store_id",
-            "foreignField": "_id",
+
+              
+              "localField": "store_id",
+              "foreignField": "_id",
             "as": "store_detail"
           }
         },
@@ -2023,7 +2280,7 @@ module.exports = class ChartsClass {
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -2045,13 +2302,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -2133,13 +2392,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -2151,8 +2430,9 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "cities",
-            "localField": "city_id",
-            "foreignField": "_id",
+
+              "localField": "city_id",
+              "foreignField": "_id",
             "as": "city_detail"
           }
         },
@@ -2219,7 +2499,7 @@ module.exports = class ChartsClass {
         }
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -2241,13 +2521,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -2329,13 +2611,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -2500,7 +2802,7 @@ module.exports = class ChartsClass {
           }
         }]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -2520,13 +2822,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -2608,13 +2912,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -2689,7 +3013,7 @@ module.exports = class ChartsClass {
                   1,
                 ],
               },
-              
+
               "month_num": {
                 "$subtract": [
                   {
@@ -2811,7 +3135,7 @@ module.exports = class ChartsClass {
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -2835,13 +3159,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -2923,13 +3249,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -2941,8 +3287,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "providers",
-            localField: "provider_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "provider_id",
+              foreignField: "_id",
+            },
             pipeline: [
               {
                 $project: {
@@ -3062,8 +3411,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "providers",
-            localField: "provider_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "provider_id",
+              foreignField: "_id",
+            },
             pipeline: [
               {
                 $project: {
@@ -3084,8 +3436,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "stores",
-            localField: "store_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "store_id",
+              foreignField: "_id",
+            },
             pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
 
             as: "store"
@@ -3196,8 +3551,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "stores",
-            localField: "store_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "store_id",
+              foreignField: "_id",
+            },
             pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
 
             as: "store"
@@ -3209,8 +3567,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "users",
-            localField: "user_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "user_id",
+              foreignField: "_id",
+            },
             pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
             as: "user"
           }
@@ -3320,8 +3681,11 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "users",
-            localField: "user_id",
-            foreignField: "_id",
+            let: {
+
+              localField: "user_id",
+              foreignField: "_id",
+            },
             pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
             as: "user"
           }
@@ -3329,7 +3693,7 @@ module.exports = class ChartsClass {
 
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter1 = { $match: { "provider.country_id": new ObjectId(country_filter) } }
       let filter2 = { $match: { "store.country_id": new ObjectId(country_filter) } }
@@ -3364,13 +3728,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -3452,13 +3818,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -3470,8 +3856,9 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "cities",
-            "localField": "city_id",
-            "foreignField": "_id",
+
+              "localField": "city_id",
+              "foreignField": "_id",
             "as": "city_id_lookup_cities"
           }
         },
@@ -3545,7 +3932,7 @@ module.exports = class ChartsClass {
         }
       ]
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)
@@ -3568,13 +3955,15 @@ module.exports = class ChartsClass {
 
     try {
 
-      let created_at = new Date(req.query.current_date)
+      let created_at = new Date(req.body.params.current_date)
       const year = created_at.getFullYear();
       const month = created_at.getMonth() + 1;
       const day = created_at.getDay()
+      const date = created_at.getDate()
+
 
       let date_filter = 0
-      let type = Number(req.query.type)
+      let type = Number(req.body.params.type)
 
       switch (type) {
         case 0:
@@ -3656,13 +4045,33 @@ module.exports = class ChartsClass {
 
           break;
       }
-      if (req.query.startDate && req.query.endDate) {
+      if (req.body.params.startDate && req.body.params.endDate) {
 
-        date_filter = {
-          $match: {
 
-            created_at: { $gt: new Date(req.query.startDate), $lte: new Date(req.query.endDate) }
+        if (new Date(req.body.startDate) == new Date(req.body.endDate)) {
 
+          const year = new Date(req.body.params.startDate).getFullYear();
+          const month = new Date(req.body.params.startDate).getMonth() + 1;
+          const date = new Date(req.body.params.startDate).getDate()
+          date_filter = {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: [{ $year: "$created_at" }, year] },
+                  { $eq: [{ $month: "$created_at" }, month] },
+                  { $eq: [{ $dayOfMonth: "$created_at" }, date] },
+                ]
+              }
+            }
+          }
+        } else {
+
+          date_filter = {
+            $match: {
+
+              created_at: { $gt: new Date(req.body.params.startDate), $lte: new Date(req.body.params.endDate) }
+
+            }
           }
         }
 
@@ -3676,6 +4085,7 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "cities",
+
             "localField": "city_id",
             "foreignField": "_id",
             "as": "city_detail"
@@ -3699,6 +4109,7 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "stores",
+
             "localField": "store_id",
             "foreignField": "_id",
             "as": "store_detail"
@@ -3769,7 +4180,7 @@ module.exports = class ChartsClass {
       ]
 
 
-      let country_filter = req.query.country_id
+      let country_filter = req.body.params.country_id
 
       let filter = { $match: { "country_id": new ObjectId(country_filter) } }
       pipeline.unshift(filter)

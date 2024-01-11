@@ -394,4 +394,4 @@ app.get("/get_charts_list", async (req, res) => {
 require("./config/express")(app)
 
 
-app.listen(5000, (data) => console.log('server started at 5000'))
+app.listen(9100, (data) => console.log('server started at 9100'))
