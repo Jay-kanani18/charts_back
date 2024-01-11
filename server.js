@@ -115,7 +115,28 @@ init()
 
 const app = express()
 
-app.use(cors())
+
+var whitelist = [
+  "https://analytics.elluminatiinc.net",
+
+  "http://localhost:9000",
+  "http://localhost:9200",
+
+
+];
+var corsOptionsDelegate = function (req, callback) {
+  var corsOptions;
+
+  if (whitelist.indexOf(req.header("Origin")) !== -1) {
+    corsOptions = { origin: true }; // reflect (enable) the requested origin in the CORS response
+  } else {
+    corsOptions = { origin: false }; // disable CORS for this request
+  }
+  callback(null, corsOptions); // callback expects two parameters: error and options
+};
+
+
+app.use(cors(corsOptionsDelegate))
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
