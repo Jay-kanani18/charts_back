@@ -93,7 +93,7 @@ module.exports = class ChartsClass {
 
     try {
 
-      let countries = await Countries.find().toArray()
+      let countries = await Countries.find({},{_id:1,country_name:1}).toArray()
 
       return res.json({ status: true, countries })
     } catch (error) {
@@ -110,7 +110,6 @@ module.exports = class ChartsClass {
 
     try {
 
-      console.log(req.body.params);
 
       let currentDate = new Date();
       let startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
@@ -331,14 +330,11 @@ module.exports = class ChartsClass {
 
 
 
-      console.log(latest_data);
 
       if (latest_data.length == 0) {
         latest_data.push({})
       }
 
-      console.log(JSON.stringify(pipeline));
-      console.log(JSON.stringify(pipeline2));
       let data = await Users.aggregate(pipeline2).toArray()
       latest_data[0].total_users = data[0]?.total_users
 
@@ -377,6 +373,7 @@ module.exports = class ChartsClass {
 
       let date_filter = 0
       let type = Number(req.body.params.type)
+
 
 
       switch (type) {
@@ -494,23 +491,42 @@ module.exports = class ChartsClass {
 
 
 
+      let data2 = await Orders.aggregate(
+        [{
+          $group: {
+            _id: null,
+            users: { $addToSet: "$user_id" }
+          }
+        },
+
+        ]
+      ).toArray()
+
 
 
 
       let pipeline = [
         { $project: { user_id: 1 } },
-        {
-          $lookup: {
-            from: "users",
-            let: {
-
-              localField: "user_id",
-              foreignField: "_id",
-            },
-            pipeline: [{ $project: { device_type: 1, _id: 1 } }],
-            as: "user_detail"
-          }
-        },
+        // {
+        //   $group:{
+        //     _id:null,
+        //     users:{$addToSet:"$user_id"}
+        //   }
+        // },
+        // {
+        //   $lookup: {
+        //     from: "users",
+        //     let: {
+        //       localField: "users",
+        //       foreignField: "_id",
+        //     },
+        //     pipeline: [{ $project: { device_type: 1, _id: 1 } }],
+        //     as: "user_detail"
+        //   }
+        // },
+        // {
+        //   $unwind:"$users"
+        // },
         {
           "$addFields": {
             "user_detail": {
@@ -576,9 +592,7 @@ module.exports = class ChartsClass {
             "__agg_sum": 0
           }
         },
-        {
-          "$limit": 5000
-        }
+
       ]
 
 
@@ -747,9 +761,8 @@ module.exports = class ChartsClass {
         {
           "$lookup": {
             "from": "carts",
-
-              "localField": "cart_id",
-              "foreignField": "_id",
+            "localField": "cart_id",
+            "foreignField": "_id",
             "as": "cart_detail"
           }
         },
@@ -853,8 +866,8 @@ module.exports = class ChartsClass {
           "$lookup": {
             "from": "carts",
 
-              "localField": "cart_id",
-              "foreignField": "_id",
+            "localField": "cart_id",
+            "foreignField": "_id",
             "as": "cart_detail"
           }
         },
@@ -1152,7 +1165,6 @@ module.exports = class ChartsClass {
 
       let country_filter = req.body.params.country_id
 
-      console.log(country_filter);
 
       let filter1 = { $match: { "store.country_id": new ObjectId(country_filter) } }
       let filter2 = { $match: { "country_id": new ObjectId(country_filter) } }
@@ -1162,7 +1174,6 @@ module.exports = class ChartsClass {
       pipeline2.unshift(date_filter)
 
 
-      console.log(pipeline1);
 
 
 
@@ -1171,7 +1182,6 @@ module.exports = class ChartsClass {
       let data = await Promise.all([Analytics.aggregate(pipeline1).toArray(), Orders.aggregate(pipeline2).toArray()])
 
 
-      console.log(data);
       // let orders = await 
 
 
@@ -1310,6 +1320,26 @@ module.exports = class ChartsClass {
 
 
       let pipeline = [
+        {
+          $addFields: {
+            created_at: {
+              $dateToString: {
+                // format: "%H:%M:%S:%L%z",
+                date: "$created_at",
+                timezone: "$timezone",
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            created_at: {
+              $dateFromString: {
+                dateString: "$created_at",
+              },
+            },
+          },
+        },
 
         {
           $addFields: {
@@ -1322,7 +1352,8 @@ module.exports = class ChartsClass {
                   { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 12] }, { $lt: [{ $hour: "$created_at" }, 15] }] }, then: "12pm-3pm" },
                   { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 15] }, { $lt: [{ $hour: "$created_at" }, 18] }] }, then: "3pm-6pm" },
                   { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 18] }, { $lt: [{ $hour: "$created_at" }, 21] }] }, then: "6pm-9pm" },
-                  { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 21] }, { $lt: [{ $hour: "$created_at" }, 24] }] }, then: "9pm-12am" }
+                  { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 21] }, { $lt: [{ $hour: "$created_at" }, 24] }] }, then: "9pm-12am" },
+                  { case: { $and: [{ $gte: [{ $hour: "$created_at" }, 0] }, { $lt: [{ $hour: "$created_at" }, 6] }] }, then: "12am-6am" }
                 ],
                 default: "Other"
               }
@@ -1346,7 +1377,8 @@ module.exports = class ChartsClass {
                   { case: { $eq: ["$_id", "12pm-3pm"] }, then: 3 },
                   { case: { $eq: ["$_id", "3pm-6pm"] }, then: 4 },
                   { case: { $eq: ["$_id", "6pm-9pm"] }, then: 5 },
-                  { case: { $eq: ["$_id", "9pm-12am"] }, then: 6 }
+                  { case: { $eq: ["$_id", "9pm-12am"] }, then: 6 },
+                  { case: { $eq: ["$_id", "12am-6am"] }, then: 7 }
                 ],
                 default: 7
               }
@@ -2001,7 +2033,7 @@ module.exports = class ChartsClass {
             revenue: -1,
           },
         },
-        {"$limit": 5 },
+        { "$limit": 5 },
 
         {
           $lookup: {
@@ -2183,8 +2215,8 @@ module.exports = class ChartsClass {
           "$lookup": {
             "from": "cities",
 
-              "localField": "city_id",
-              "foreignField": "_id",
+            "localField": "city_id",
+            "foreignField": "_id",
             "as": "city_detail"
           }
         },
@@ -2207,9 +2239,9 @@ module.exports = class ChartsClass {
           "$lookup": {
             "from": "stores",
 
-              
-              "localField": "store_id",
-              "foreignField": "_id",
+
+            "localField": "store_id",
+            "foreignField": "_id",
             "as": "store_detail"
           }
         },
@@ -2431,8 +2463,8 @@ module.exports = class ChartsClass {
           "$lookup": {
             "from": "cities",
 
-              "localField": "city_id",
-              "foreignField": "_id",
+            "localField": "city_id",
+            "foreignField": "_id",
             "as": "city_detail"
           }
         },
@@ -3857,8 +3889,8 @@ module.exports = class ChartsClass {
           "$lookup": {
             "from": "cities",
 
-              "localField": "city_id",
-              "foreignField": "_id",
+            "localField": "city_id",
+            "foreignField": "_id",
             "as": "city_id_lookup_cities"
           }
         },
