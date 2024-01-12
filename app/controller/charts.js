@@ -1823,21 +1823,21 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "providers",
-            let: {
+            // let: {
 
               localField: "_id",
               foreignField: "_id",
-            },
-            pipeline: [
-              {
-                $project: {
-                  first_name: 1,
-                  last_name: 1,
-                  unique_id: 1,
-                  image_url: 1
-                },
-              },
-            ],
+            // },
+            // pipeline: [
+            //   {
+            //     $project: {
+            //       first_name: 1,
+            //       last_name: 1,
+            //       unique_id: 1,
+            //       image_url: 1
+            //     },
+            //   },
+            // ],
             as: "provider",
           },
         },
@@ -2000,24 +2000,7 @@ module.exports = class ChartsClass {
             },
           },
         },
-        // {
-        //   $addFields: {
-        //     year: { $year: "$created_at" },
-        //     month: { $month: "$created_at" },
-        //   },
-        // },
-        // {
-        //   $match: {
-        //     $expr: {
-        //       $and: [
-        //         { $eq: ["$year", 2023] }, // Replace 2023 with your target year
-        //         { $gte: ["$month", 8] },
-        //         { $lte: ["$month", 12] }
-        //       ]
-        //     }
-        //   }
-        // },
-
+    
 
         {
           $group: {
@@ -2033,26 +2016,26 @@ module.exports = class ChartsClass {
             revenue: -1,
           },
         },
-        { "$limit": 5 },
+        { $limit: 5 },
 
         {
           $lookup: {
             'from': "users",
-            'let': {
+            // 'let': {
 
               'localField': "_id",
               'foreignField': "_id",
-            },
-            'pipeline': [
-              {
-                '$project': {
-                  first_name: 1,
-                  last_name: 1,
-                  unique_id: 1,
-                  image_url: 1
-                },
-              },
-            ],
+            // },
+            // 'pipeline': [
+            //   {
+            //     '$project': {
+            //       first_name: 1,
+            //       last_name: 1,
+            //       unique_id: 1,
+            //       image_url: 1
+            //     },
+            //   },
+            // ],
             as: "user",
           },
         },
