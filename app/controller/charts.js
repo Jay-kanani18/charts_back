@@ -293,12 +293,12 @@ module.exports = class ChartsClass {
           $lookup: {
             from: "countries",
 
-            let: {
+            // let: {
 
               localField: "country_name",
               foreignField: "country_name",
-            },
-            pipeline: [{ $project: { country_name: 1, _id: 1 } }],
+            // },
+            // pipeline: [{ $project: { country_name: 1, _id: 1 } }],
             as: "country"
           }
         },
@@ -327,23 +327,24 @@ module.exports = class ChartsClass {
 
 
 
-      let latest_data = await Orders.aggregate(pipeline).toArray()
+      let latest_data = await  Promise.all([Orders.aggregate(pipeline).toArray() ,Users.aggregate(pipeline2).toArray()])
 
 
+      console.log(latest_data);
 
 
-      if (latest_data.length == 0) {
-        latest_data.push({})
+      if (latest_data[0].length == 0) {
+        latest_data[0].push({})
       }
 
-      let data = await Users.aggregate(pipeline2).toArray()
-      latest_data[0].total_users = data[0]?.total_users
+      // let data = await 
+      latest_data[0][0].total_users = latest_data[1][0]?.total_users
 
 
 
 
 
-      return res.json({ status: true, data: { latest_data } })
+      return res.json({ status: true, data: { latest_data:latest_data[0] } })
     } catch (error) {
       console.log(error);
 
