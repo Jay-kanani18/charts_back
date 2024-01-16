@@ -18,6 +18,7 @@ async function init() {
   try {
 
     let client = new MongoClient("mongodb+srv://hopdemo:akQWOEus3ajieR@hop-prod-db.oo3hb.mongodb.net");
+    // let client = new MongoClient("mongodb://localhost:27017");
     await client.connect();
     console.log("conected");
     database = client.db('hopdb');
@@ -491,64 +492,45 @@ module.exports = class ChartsClass {
 
 
 
-      let data2 = await Orders.aggregate(
-        [{
-          $group: {
-            _id: null,
-            users: { $addToSet: "$user_id" }
-          }
-        },
-
-        ]
-      ).toArray()
-
-
-
-
       let pipeline = [
         { $project: { user_id: 1 } },
-        // {
-        //   $group:{
-        //     _id:null,
-        //     users:{$addToSet:"$user_id"}
-        //   }
-        // },
-        // {
-        //   $lookup: {
-        //     from: "users",
-        //     let: {
-        //       localField: "users",
-        //       foreignField: "_id",
-        //     },
-        //     pipeline: [{ $project: { device_type: 1, _id: 1 } }],
-        //     as: "user_detail"
-        //   }
-        // },
-        // {
-        //   $unwind:"$users"
-        // },
+
         {
-          "$addFields": {
-            "user_detail": {
-              "$ifNull": [
-                {
-                  "$arrayElemAt": [
-                    "$user_detail",
-                    0
-                  ]
-                },
-                null
-              ]
-            }
+          $lookup: {
+            from: "users",
+            // let: {
+              localField: "user_id",
+              foreignField: "_id",
+            // },
+            // pipeline: [{ $project: { device_type: 1, _id: 1 } }],
+            as: "user_detail"
           }
         },
         {
-          "$match": {
-            "user_detail.device_type": {
-              "$nin": []
-            }
-          }
+          $unwind:"$user_detail"
         },
+        // {
+        //   "$addFields": {
+        //     "user_detail": {
+        //       "$ifNull": [
+        //         {
+        //           "$arrayElemAt": [
+        //             "$user_detail",
+        //             0
+        //           ]
+        //         },
+        //         null
+        //       ]
+        //     }
+        //   }
+        // },
+        // {
+        //   "$match": {
+        //     "user_detail.device_type": {
+        //       "$nin": []
+        //     }
+        //   }
+        // },
         {
           "$group": {
             "_id": {
@@ -3302,21 +3284,21 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "providers",
-            let: {
+            // let: {
 
               localField: "provider_id",
               foreignField: "_id",
-            },
-            pipeline: [
-              {
-                $project: {
-                  first_name: 1,
-                  last_name: 1,
-                  unique_id: 1,
-                  country_id: 1
-                },
-              },
-            ],
+            // },
+            // pipeline: [
+            //   {
+            //     $project: {
+            //       first_name: 1,
+            //       last_name: 1,
+            //       unique_id: 1,
+            //       country_id: 1
+            //     },
+            //   },
+            // ],
 
             as: "provider",
           },
@@ -3426,21 +3408,21 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "providers",
-            let: {
+            // let: {
 
               localField: "provider_id",
               foreignField: "_id",
-            },
-            pipeline: [
-              {
-                $project: {
-                  first_name: 1,
-                  last_name: 1,
-                  unique_id: 1,
-                  country_id: 1
-                },
-              },
-            ],
+            // },
+            // pipeline: [
+            //   {
+            //     $project: {
+            //       first_name: 1,
+            //       last_name: 1,
+            //       unique_id: 1,
+            //       country_id: 1
+            //     },
+            //   },
+            // ],
 
             as: "provider",
           },
@@ -3451,12 +3433,12 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "stores",
-            let: {
+            // let: {
 
               localField: "store_id",
               foreignField: "_id",
-            },
-            pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
+            // },
+            // pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
 
             as: "store"
           }
@@ -3566,12 +3548,12 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "stores",
-            let: {
+            // let: {
 
               localField: "store_id",
               foreignField: "_id",
-            },
-            pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
+            // },
+            // pipeline: [{ $project: { name: 1, unique_id: 1, country_id: 1 } }],
 
             as: "store"
           }
@@ -3582,12 +3564,12 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "users",
-            let: {
+            // let: {
 
               localField: "user_id",
               foreignField: "_id",
-            },
-            pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
+            // },
+            // pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
             as: "user"
           }
         },
@@ -3696,12 +3678,12 @@ module.exports = class ChartsClass {
         {
           $lookup: {
             from: "users",
-            let: {
+            // let: {
 
               localField: "user_id",
               foreignField: "_id",
-            },
-            pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
+            // },
+            // pipeline: [{ $project: { first_name: 1, last_name: 1, unique_id: 1, country_id: 1 } }],
             as: "user"
           }
         },
@@ -3726,14 +3708,17 @@ module.exports = class ChartsClass {
 
 
 
-      let provider = await Reviews.aggregate(pipeline1).toArray()
-      let store = await Reviews.aggregate(pipeline2).toArray()
-      let user = await Reviews.aggregate(pipeline3).toArray()
+      // let provider = 
+      // let store = 
+      // let user = 
 
 
+      let data = await  Promise.all([ Reviews.aggregate(pipeline1).toArray(), Reviews.aggregate(pipeline2).toArray(), Reviews.aggregate(pipeline3).toArray()])
+ 
+console.log(data);
 
 
-      return res.json({ status: true, data: { provider, user, store } })
+      return res.json({ status: true, data: { provider:data[0], user:data[2], store:data[1] } })
     } catch (error) {
       console.log(error);
 
