@@ -3,6 +3,28 @@ const Users = require('../models/users')
 
 module.exports = {
 
+    login: async function (req, res) {
+        try {
+            // user_detail = await Us
+            const user = await Users.findByCredentials(
+                req.body.email,
+                req.body.password
+            );
+            if(!user.status ){
+              return  res.json({ status: false , data:{  msg: user.msg} });
+
+            }
+            user.data.user = await user.data.user.generateAuthToken();
+            res.json(user);
+             //uers.findOne({})
+            // return res.json({ status: true })
+        } catch (error) {
+            console.log(error);
+            console.log('jjjjjj');
+
+        }
+    },
+
     get_charts: async function (req, res) {
         try {
 
@@ -87,5 +109,6 @@ module.exports = {
 
         }
     }
+
 
 }

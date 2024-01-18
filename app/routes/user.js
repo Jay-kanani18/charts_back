@@ -7,4 +7,5 @@ module.exports = function (app) {
     app.route('/get_user_detail').get(users.get_user_detail);
     app.route('/update_user').post(users.update_user);
     app.route('/delete_user').delete(users.delete_user);
+    app.route('/login').post(users.login);
 }

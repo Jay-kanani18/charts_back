@@ -9,7 +9,7 @@ module.exports = class ForWhom {
         try {
 
 
-            let user_detail = await User.aggregate([{$project:{name:1,_id:1,charts_catagory:1}},{$lookup:{
+            let user_detail = await User.aggregate([{$project:{name:1,_id:1,charts_catagory:1,token:1}},{$lookup:{
                 from:"for_whoms",
                 localField:"charts_catagory",
                 foreignField:"_id",

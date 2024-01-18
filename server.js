@@ -6,6 +6,7 @@ require('./app/models/users')
 const Users = require('./app/models/users')
 const bodyParser = require("body-parser");
 const Chart = require('./app/models/charts')
+const jwt = require("jsonwebtoken");
 
 async function init() {
 
@@ -137,7 +138,42 @@ app.use(cors())
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(authentication)
 
+async function authentication(req,res,next){
+  try {
+
+    console.log(req.url);
+
+    if(req.url != '/login'){
+
+      const token = req.header("Authorization").replace("Bearer ", "");
+      console.log(token);
+      const decoded = jwt.verify(token, 'googleismine');
+      const user = await Users.findOne({
+        _id: decoded._id,
+        "token": token,
+      });
+      if (!user) {
+        
+        res.json({status:false,msg:"user not found"})
+        // throw Error("user not Found");
+      }
+      req.token = token;
+      req.user = user;
+    }
+      next();
+    
+    } catch (e) {
+      console.log(e);
+      console.log("plese auth");
+      
+    res.json({ status:false , data:{msg: "Unauthorized"} ,code:401});
+  }
+
+
+
+}
 
 app.get("/get_charts_list", async (req, res) => {
 
